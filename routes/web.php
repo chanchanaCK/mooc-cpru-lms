@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Controllers\Admin\CouponController as AdminCouponController;
+use App\Http\Controllers\Admin\CourseController as AdminCourseController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CheckoutController;
@@ -91,6 +95,27 @@ Route::middleware(['auth', 'instructor'])->prefix('studio')->name('studio.')->gr
     Route::post('/lessons/{lesson}/questions', [StudioQuizController::class, 'storeQuestion'])->name('questions.store');
     Route::put('/questions/{question}', [StudioQuizController::class, 'updateQuestion'])->name('questions.update');
     Route::delete('/questions/{question}', [StudioQuizController::class, 'destroyQuestion'])->name('questions.destroy');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Admin (role-gated)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+    Route::put('/users/{user}/role', [AdminUserController::class, 'updateRole'])->name('users.role');
+
+    Route::get('/courses', [AdminCourseController::class, 'index'])->name('courses.index');
+    Route::post('/courses/{course}/publish', [AdminCourseController::class, 'togglePublish'])->name('courses.publish');
+    Route::delete('/courses/{course}', [AdminCourseController::class, 'destroy'])->name('courses.destroy');
+
+    Route::get('/coupons', [AdminCouponController::class, 'index'])->name('coupons.index');
+    Route::post('/coupons', [AdminCouponController::class, 'store'])->name('coupons.store');
+    Route::post('/coupons/{coupon}/toggle', [AdminCouponController::class, 'toggle'])->name('coupons.toggle');
+    Route::delete('/coupons/{coupon}', [AdminCouponController::class, 'destroy'])->name('coupons.destroy');
 });
 
 require __DIR__.'/auth.php';

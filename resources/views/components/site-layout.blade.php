@@ -69,6 +69,9 @@
                                 @if (auth()->user()->isInstructor())
                                     <a href="{{ route('studio.index') }}" class="block px-4 py-2 hover:bg-gray-50">สตูดิโอผู้สอน</a>
                                 @endif
+                                @if (auth()->user()->isAdmin())
+                                    <a href="{{ route('admin.dashboard') }}" class="block px-4 py-2 hover:bg-gray-50 text-rose-600">แผงผู้ดูแลระบบ</a>
+                                @endif
                                 <a href="{{ route('orders.index') }}" class="block px-4 py-2 hover:bg-gray-50">คำสั่งซื้อของฉัน</a>
                                 <a href="{{ route('profile.edit') }}" class="block px-4 py-2 hover:bg-gray-50">โปรไฟล์</a>
                                 <form method="POST" action="{{ route('logout') }}">
