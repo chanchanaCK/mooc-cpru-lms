@@ -1,0 +1,26 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Category extends Model
+{
+    protected $fillable = ['name', 'slug', 'icon', 'description', 'sort_order'];
+
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
+    public function courses(): HasMany
+    {
+        return $this->hasMany(Course::class);
+    }
+
+    public function publishedCourses(): HasMany
+    {
+        return $this->courses()->where('status', 'published');
+    }
+}
