@@ -29,6 +29,30 @@
         @endforeach
     </div>
 
+    {{-- Credit bank (คลังหน่วยกิต) --}}
+    <div class="mt-8 flex items-center justify-between gap-3">
+        <h2 class="text-lg font-bold flex items-center gap-2"><i class="bi bi-mortarboard text-indigo-600" aria-hidden="true"></i> ระบบคลังหน่วยกิต</h2>
+        <a href="{{ route('admin.programs.index') }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700">จัดการหลักสูตร <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+    </div>
+    <div class="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white p-4">
+            <p class="text-2xl font-bold">{{ \App\Models\CreditRecord::fmt($creditStats['credits_banked']) }}</p>
+            <p class="text-xs text-indigo-100">หน่วยกิตในคลังรวม</p>
+        </div>
+        <a href="{{ route('admin.programs.index') }}" class="group rounded-2xl bg-white ring-1 ring-gray-200 p-4 hover:ring-indigo-300 hover:shadow-sm transition">
+            <p class="text-2xl font-bold group-hover:text-indigo-600">{{ number_format($creditStats['programs']) }}</p>
+            <p class="text-xs text-gray-500">หลักสูตรที่เปิด <i class="bi bi-arrow-right opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></i></p>
+        </a>
+        <a href="{{ route('admin.programs.index') }}" class="group rounded-2xl bg-white ring-1 ring-gray-200 p-4 hover:ring-indigo-300 hover:shadow-sm transition">
+            <p class="text-2xl font-bold group-hover:text-indigo-600">{{ number_format($creditStats['program_completions']) }}</p>
+            <p class="text-xs text-gray-500">สำเร็จการศึกษา</p>
+        </a>
+        <a href="{{ route('admin.transfers.index') }}" class="group rounded-2xl bg-white ring-1 p-4 hover:shadow-sm transition {{ $creditStats['pending_transfers'] > 0 ? 'ring-amber-300 bg-amber-50/40' : 'ring-gray-200 hover:ring-indigo-300' }}">
+            <p class="text-2xl font-bold {{ $creditStats['pending_transfers'] > 0 ? 'text-amber-700' : 'group-hover:text-indigo-600' }}">{{ number_format($creditStats['pending_transfers']) }}</p>
+            <p class="text-xs text-gray-500">คำขอเทียบโอนค้าง <i class="bi bi-arrow-right opacity-0 group-hover:opacity-100 transition" aria-hidden="true"></i></p>
+        </a>
+    </div>
+
     <div class="mt-6 grid lg:grid-cols-2 gap-6">
         {{-- Top courses bar chart --}}
         <div class="rounded-2xl bg-white ring-1 ring-gray-200 p-5">

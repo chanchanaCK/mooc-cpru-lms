@@ -5,8 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Certificate;
 use App\Models\Course;
+use App\Models\CreditRecord;
+use App\Models\CreditTransferRequest;
 use App\Models\Enrollment;
 use App\Models\Order;
+use App\Models\Program;
+use App\Models\ProgramEnrollment;
 use App\Models\User;
 use Illuminate\View\View;
 
@@ -25,6 +29,14 @@ class DashboardController extends Controller
             'certificates' => Certificate::count(),
         ];
 
+        // Credit bank (คลังหน่วยกิต) overview.
+        $creditStats = [
+            'credits_banked' => (float) CreditRecord::where('status', 'earned')->sum('credits'),
+            'programs' => Program::where('status', 'published')->count(),
+            'program_completions' => ProgramEnrollment::where('status', 'completed')->count(),
+            'pending_transfers' => CreditTransferRequest::pending()->count(),
+        ];
+
         $topCourses = Course::query()
             ->with('instructor')
             ->orderByDesc('students_count')
@@ -39,6 +51,6 @@ class DashboardController extends Controller
             ->take(6)
             ->get();
 
-        return view('admin.dashboard', compact('stats', 'topCourses', 'maxStudents', 'recentOrders'));
+        return view('admin.dashboard', compact('stats', 'creditStats', 'topCourses', 'maxStudents', 'recentOrders'));
     }
 }

@@ -15,8 +15,10 @@ use Illuminate\Support\Facades\DB;
  */
 class LearningService
 {
-    public function __construct(private readonly CertificateService $certificates)
-    {
+    public function __construct(
+        private readonly CertificateService $certificates,
+        private readonly CreditBankService $creditBank,
+    ) {
     }
 
     /** Enrol a user into a course (idempotent). */
@@ -82,9 +84,10 @@ class LearningService
                 'completed_at' => $percent >= 100 ? now() : null,
             ]);
 
-        // Award a certificate the moment the course is fully completed.
+        // Award a certificate and bank credits the moment the course is completed.
         if ($percent >= 100 && $total > 0) {
             $this->certificates->issueFor($user, $course);
+            $this->creditBank->depositForCourse($user, $course);
         }
 
         return $percent;

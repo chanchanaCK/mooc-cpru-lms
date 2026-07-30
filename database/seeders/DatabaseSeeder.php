@@ -9,6 +9,7 @@ use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Lesson;
 use App\Models\LessonCompletion;
+use App\Models\Program;
 use App\Models\Question;
 use App\Models\Review;
 use App\Models\Section;
@@ -40,6 +41,14 @@ class DatabaseSeeder extends Seeder
             'email' => 'student@example.com',
             'password' => 'password',
             'role' => 'student',
+            'email_verified_at' => now(),
+        ]);
+
+        $registrar = User::create([
+            'name' => 'นายทะเบียน คลังหน่วยกิต',
+            'email' => 'registrar@example.com',
+            'password' => 'password',
+            'role' => 'registrar',
             'email_verified_at' => now(),
         ]);
 
@@ -84,15 +93,16 @@ class DatabaseSeeder extends Seeder
 
         // ---- Enrolments, progress & reviews -------------------------------
         $courses = Course::all();
-        $learners = collect([$student])->concat(
-            collect(range(1, 6))->map(fn ($n) => User::create([
-                'name' => "ผู้เรียน {$n}",
-                'email' => "learner{$n}@example.com",
-                'password' => 'password',
-                'role' => 'student',
-                'email_verified_at' => now(),
-            ]))
-        );
+
+        // Random learners (kept separate from the demo student so the student's
+        // dashboard & credit bank stay predictable).
+        $learners = collect(range(1, 6))->map(fn ($n) => User::create([
+            'name' => "ผู้เรียน {$n}",
+            'email' => "learner{$n}@example.com",
+            'password' => 'password',
+            'role' => 'student',
+            'email_verified_at' => now(),
+        ]));
 
         foreach ($learners as $learner) {
             foreach ($courses->random(rand(2, 4)) as $course) {
@@ -101,14 +111,63 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // Make sure the demo student has predictable data on the dashboard.
-        $this->enrollWithProgress($student, $courses->first(), 40);
-        $this->enrollWithProgress($student, $courses->get(1), 100);
+        // The demo student gets a fixed set of enrolments so the dashboard and
+        // credit bank are deterministic: 2 (JS) + 3 (Python) + 2 (UI/UX) = 7 credits.
+        $this->enrollWithProgress($student, $courses->first(), 40);   // Laravel — in progress, no credit yet
+        $this->enrollWithProgress($student, $courses->get(1), 100);   // JavaScript (CS102, 2 credits)
+        $this->enrollWithProgress($student, Course::where('slug', 'python-data-analysis')->first(), 100);      // DA201, 3 credits
+        $this->enrollWithProgress($student, Course::where('slug', 'ui-ux-design-fundamentals')->first(), 100); // DS101, 2 credits
+        $this->addReview($student, $courses->get(1));
 
         // ---- Certificates for completed courses --------------------------
         $certificates = app(CertificateService::class);
-        Enrollment::where('progress_percent', '>=', 100)->with(['user', 'course'])->get()
-            ->each(fn ($e) => $e->course && $certificates->issueFor($e->user, $e->course));
+        Enrollment::where('progress_percent', '>=', 100)->get(['user_id', 'course_id'])
+            ->each(function (Enrollment $e) use ($certificates) {
+                $user = User::find($e->user_id);
+                $course = Course::find($e->course_id);
+                if ($user && $course) {
+                    $certificates->issueFor($user, $course);
+                }
+            });
+
+        // ---- Credit bank: deposit credits for completed credit-bearing courses ----
+        $creditBank = app(\App\Services\CreditBankService::class);
+        Enrollment::where('progress_percent', '>=', 100)->get(['user_id', 'course_id'])
+            ->each(function (Enrollment $e) use ($creditBank) {
+                $user = User::find($e->user_id);
+                $course = Course::find($e->course_id);
+                if ($user && $course) {
+                    $creditBank->depositForCourse($user, $course);
+                }
+            });
+
+        // ---- Qualification types & levels (admin-managed reference data) --
+        $this->seedQualifications();
+
+        // ---- Programs (หลักสูตรสะสมหน่วยกิต) ------------------------------
+        $this->seedPrograms($registrar, $student);
+
+        // ---- Credit transfer / RPL sample requests -----------------------
+        $this->seedTransfers($student, $registrar);
+
+        // ---- Demo organization (B2B) -------------------------------------
+        $orgService = app(\App\Services\OrgService::class);
+        $org = $orgService->createOrganization($student, 'บริษัท ตัวอย่าง จำกัด', 10);
+
+        foreach (['learner1', 'learner2', 'learner3'] as $email) {
+            if ($u = User::where('email', "{$email}@example.com")->first()) {
+                $orgService->addMember($org, $u, 'member');
+            }
+        }
+
+        // Assign two courses to everyone in the org.
+        $orgService->assignCourse($org, $courses->first(), $student);          // Laravel
+        $orgService->assignCourse($org, $courses->get(1), $student);           // JavaScript
+
+        // Assign an upskill program to the whole team (members auto-enrol).
+        if ($teamProgram = Program::where('type', 'micro')->first()) {
+            $orgService->assignProgram($org, $teamProgram, $student);
+        }
 
         $this->refreshCounters();
     }
@@ -144,6 +203,117 @@ class DatabaseSeeder extends Seeder
         }
     }
 
+    /** Default qualification types & levels (ประเภท/ระดับคุณวุฒิ) — admin-editable. */
+    private function seedQualifications(): void
+    {
+        $types = [
+            ['slug' => 'certificate', 'name' => 'สัมฤทธิบัตร'],
+            ['slug' => 'micro', 'name' => 'ประกาศนียบัตรไมโครเครดิเชียล'],
+            ['slug' => 'diploma', 'name' => 'อนุปริญญา'],
+            ['slug' => 'degree', 'name' => 'ปริญญา'],
+        ];
+        foreach ($types as $i => $t) {
+            \App\Models\QualificationType::create([...$t, 'sort_order' => $i, 'is_active' => true]);
+        }
+
+        $levels = [
+            ['level' => 1, 'name' => 'ประกาศนียบัตรวิชาชีพ (ปวช.)'],
+            ['level' => 2, 'name' => 'ประกาศนียบัตรวิชาชีพชั้นสูง (ปวส.)'],
+            ['level' => 3, 'name' => 'อนุปริญญา'],
+            ['level' => 4, 'name' => 'ปริญญาตรี'],
+            ['level' => 5, 'name' => 'ประกาศนียบัตรบัณฑิต'],
+            ['level' => 6, 'name' => 'ปริญญาโท'],
+            ['level' => 7, 'name' => 'ประกาศนียบัตรบัณฑิตชั้นสูง'],
+            ['level' => 8, 'name' => 'ปริญญาเอก'],
+        ];
+        foreach ($levels as $i => $l) {
+            \App\Models\QualificationLevel::create([...$l, 'sort_order' => $i]);
+        }
+    }
+
+    /** Sample credit-bank programs + demo student enrolments. */
+    private function seedPrograms(User $registrar, User $student): void
+    {
+        $creditBank = app(\App\Services\CreditBankService::class);
+
+        $configs = [
+            [
+                'title' => 'ประกาศนียบัตรนักพัฒนาเว็บมืออาชีพ',
+                'subtitle' => 'เส้นทางสู่ Full-stack Developer — สะสมหน่วยกิตจากคอร์สเขียนโปรแกรม',
+                'type' => 'certificate', 'nqf_level' => 4, 'required_credits' => 8, 'duration_months' => 12,
+                'courses' => [['laravel-12-beginner', 'required'], ['modern-javascript', 'required'], ['react-zero-to-production', 'required']],
+            ],
+            [
+                'title' => 'ไมโครเครดิท: การตลาดดิจิทัลสำหรับคนทำงาน',
+                'subtitle' => 'Upskill ทักษะการตลาดออนไลน์แบบเก็บสะสมหน่วยกิต',
+                'type' => 'micro', 'nqf_level' => 2, 'required_credits' => 4, 'duration_months' => 4,
+                'courses' => [['digital-marketing-101', 'required'], ['business-english', 'required']],
+            ],
+            [
+                'title' => 'ประกาศนียบัตรวิทยาการข้อมูลเบื้องต้น',
+                'subtitle' => 'Reskill สู่สายข้อมูล ด้วยการวิเคราะห์ข้อมูลด้วย Python',
+                'type' => 'certificate', 'nqf_level' => 4, 'required_credits' => 3, 'duration_months' => 6,
+                'courses' => [['python-data-analysis', 'required'], ['ui-ux-design-fundamentals', 'elective']],
+            ],
+        ];
+
+        $programs = [];
+        foreach ($configs as $cfg) {
+            $program = Program::create([
+                'title' => $cfg['title'],
+                'slug' => Program::generateUniqueSlug($cfg['title']),
+                'subtitle' => $cfg['subtitle'],
+                'description' => "หลักสูตรสะสมหน่วยกิตตามระบบธนาคารหน่วยกิต เรียนคอร์สในหลักสูตรให้ผ่านเพื่อสะสมหน่วยกิต เมื่อครบเกณฑ์จะได้รับคุณวุฒิโดยอัตโนมัติ",
+                'type' => $cfg['type'],
+                'nqf_level' => $cfg['nqf_level'],
+                'required_credits' => $cfg['required_credits'],
+                'duration_months' => $cfg['duration_months'],
+                'status' => 'published',
+                'owner_id' => $registrar->id,
+            ]);
+
+            $sort = 0;
+            foreach ($cfg['courses'] as [$slug, $requirement]) {
+                if ($course = Course::where('slug', $slug)->first()) {
+                    $program->courses()->attach($course->id, ['requirement' => $requirement, 'sort_order' => $sort++]);
+                }
+            }
+
+            $programs[] = $program;
+        }
+
+        // Demo student: Web Dev (in progress) + Data Science (auto-completes from banked credits).
+        $creditBank->enrollProgram($student, $programs[0]);
+        $creditBank->enrollProgram($student, $programs[2]);
+    }
+
+    /** Sample credit-transfer (RPL) requests for the demo student. */
+    private function seedTransfers(User $student, User $registrar): void
+    {
+        $creditBank = app(\App\Services\CreditBankService::class);
+
+        // Approved — banks 3 transfer credits into the student's bank.
+        $approved = $student->transferRequests()->create([
+            'source_type' => 'institution',
+            'source_name' => 'มหาวิทยาลัยเทคโนโลยีตัวอย่าง',
+            'course_name' => 'สถิติสำหรับนักวิเคราะห์ข้อมูล',
+            'credits_requested' => 3,
+            'evidence_note' => 'ผ่านรายวิชาระดับปริญญาตรี เกรด A ปีการศึกษา 2566',
+            'status' => 'pending',
+        ]);
+        $creditBank->approveTransfer($approved, $registrar, 3.0, 'A', 'หลักฐานครบถ้วน อนุมัติเต็มจำนวน');
+
+        // Pending — awaits registrar review.
+        $student->transferRequests()->create([
+            'source_type' => 'experience',
+            'source_name' => 'บริษัท เทคสตาร์ท จำกัด',
+            'course_name' => 'การพัฒนาเว็บจากประสบการณ์ทำงาน',
+            'credits_requested' => 2,
+            'evidence_note' => 'ทำงานตำแหน่ง Junior Developer 1 ปี พร้อมแฟ้มผลงาน',
+            'status' => 'pending',
+        ]);
+    }
+
     private function createCourse(array $data, User $instructor, Category $category): Course
     {
         $course = Course::create([
@@ -157,6 +327,13 @@ class DatabaseSeeder extends Seeder
             'level' => $data['level'],
             'status' => 'published',
             'published_at' => now()->subDays(rand(1, 120)),
+            // Credit bank (คลังหน่วยกิต)
+            'course_code' => $data['course_code'] ?? null,
+            'credit_bearing' => $data['credit_bearing'] ?? false,
+            'credits' => $data['credits'] ?? 0,
+            'learning_hours' => $data['learning_hours'] ?? 0,
+            'grading_method' => $data['grading_method'] ?? 'pass_fail',
+            'pass_threshold' => $data['pass_threshold'] ?? 70,
         ]);
 
         $order = 0;
@@ -247,6 +424,7 @@ class DatabaseSeeder extends Seeder
                 'title' => 'เริ่มต้นเขียนเว็บด้วย Laravel 12', 'slug' => 'laravel-12-beginner',
                 'subtitle' => 'สร้างเว็บแอปพลิเคชันตั้งแต่ศูนย์จนใช้งานได้จริง', 'category' => 'programming',
                 'instructor' => 'somchai@example.com', 'price' => 0, 'level' => 'beginner', 'description' => $lorem,
+                'course_code' => 'CS101', 'credit_bearing' => true, 'credits' => 3, 'learning_hours' => 45, 'grading_method' => 'graded',
                 'sections' => [
                     ['title' => 'ปูพื้นฐาน', 'lessons' => [
                         ['title' => 'แนะนำคอร์สและการติดตั้ง', 'seconds' => 360],
@@ -264,6 +442,7 @@ class DatabaseSeeder extends Seeder
                 'title' => 'JavaScript สมัยใหม่ ES6+', 'slug' => 'modern-javascript',
                 'subtitle' => 'เข้าใจ JavaScript อย่างลึกซึ้งเพื่องานจริง', 'category' => 'programming',
                 'instructor' => 'somchai@example.com', 'price' => 590, 'level' => 'intermediate', 'description' => $lorem,
+                'course_code' => 'CS102', 'credit_bearing' => true, 'credits' => 2, 'learning_hours' => 30, 'grading_method' => 'graded',
                 'sections' => [
                     ['title' => 'พื้นฐานภาษา', 'lessons' => [
                         ['title' => 'let, const และ scope', 'seconds' => 420],
@@ -279,6 +458,7 @@ class DatabaseSeeder extends Seeder
                 'title' => 'ออกแบบ UI/UX ให้ผู้ใช้รัก', 'slug' => 'ui-ux-design-fundamentals',
                 'subtitle' => 'หลักการออกแบบและการใช้ Figma', 'category' => 'design',
                 'instructor' => 'piya@example.com', 'price' => 0, 'level' => 'beginner', 'description' => $lorem,
+                'course_code' => 'DS101', 'credit_bearing' => true, 'credits' => 2, 'learning_hours' => 30, 'grading_method' => 'pass_fail',
                 'sections' => [
                     ['title' => 'หลักการออกแบบ', 'lessons' => [
                         ['title' => 'Design Thinking เบื้องต้น', 'seconds' => 480],
@@ -294,6 +474,7 @@ class DatabaseSeeder extends Seeder
                 'title' => 'ปั้นแบรนด์ให้ปังด้วย Digital Marketing', 'slug' => 'digital-marketing-101',
                 'subtitle' => 'กลยุทธ์การตลาดออนไลน์ครบวงจร', 'category' => 'marketing',
                 'instructor' => 'wanna@example.com', 'price' => 890, 'level' => 'beginner', 'description' => $lorem,
+                'course_code' => 'MK101', 'credit_bearing' => true, 'credits' => 2, 'learning_hours' => 30, 'grading_method' => 'pass_fail',
                 'sections' => [
                     ['title' => 'ภาพรวมการตลาดออนไลน์', 'lessons' => [
                         ['title' => 'Marketing Funnel', 'seconds' => 540],
@@ -309,6 +490,7 @@ class DatabaseSeeder extends Seeder
                 'title' => 'วิเคราะห์ข้อมูลด้วย Python', 'slug' => 'python-data-analysis',
                 'subtitle' => 'Pandas, NumPy และการทำ Visualization', 'category' => 'data-ai',
                 'instructor' => 'somchai@example.com', 'price' => 1290, 'level' => 'intermediate', 'description' => $lorem,
+                'course_code' => 'DA201', 'credit_bearing' => true, 'credits' => 3, 'learning_hours' => 45, 'grading_method' => 'graded',
                 'sections' => [
                     ['title' => 'เริ่มต้นกับข้อมูล', 'lessons' => [
                         ['title' => 'ติดตั้งและ Jupyter Notebook', 'seconds' => 420],
@@ -335,6 +517,7 @@ class DatabaseSeeder extends Seeder
                 'title' => 'ภาษาอังกฤษเพื่อการทำงาน', 'slug' => 'business-english',
                 'subtitle' => 'สื่อสารมั่นใจในที่ทำงาน', 'category' => 'language',
                 'instructor' => 'piya@example.com', 'price' => 490, 'level' => 'beginner', 'description' => $lorem,
+                'course_code' => 'EN101', 'credit_bearing' => true, 'credits' => 2, 'learning_hours' => 30, 'grading_method' => 'pass_fail',
                 'sections' => [
                     ['title' => 'การสนทนาพื้นฐาน', 'lessons' => [
                         ['title' => 'แนะนำตัวอย่างมืออาชีพ', 'seconds' => 420],
@@ -346,6 +529,7 @@ class DatabaseSeeder extends Seeder
                 'title' => 'React.js จากพื้นฐานสู่ Production', 'slug' => 'react-zero-to-production',
                 'subtitle' => 'สร้าง Single Page Application ระดับมืออาชีพ', 'category' => 'programming',
                 'instructor' => 'somchai@example.com', 'price' => 1490, 'level' => 'advanced', 'description' => $lorem,
+                'course_code' => 'CS301', 'credit_bearing' => true, 'credits' => 3, 'learning_hours' => 45, 'grading_method' => 'graded',
                 'sections' => [
                     ['title' => 'พื้นฐาน React', 'lessons' => [
                         ['title' => 'Component และ JSX', 'seconds' => 600],

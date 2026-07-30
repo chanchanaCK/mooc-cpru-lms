@@ -19,6 +19,8 @@ class Course extends Model
         'thumbnail', 'price', 'level', 'language', 'status',
         'duration_minutes', 'students_count', 'lessons_count', 'rating_avg', 'rating_count',
         'published_at',
+        // Credit bank (คลังหน่วยกิต)
+        'course_code', 'credit_bearing', 'credits', 'learning_hours', 'grading_method', 'pass_threshold',
     ];
 
     protected function casts(): array
@@ -27,6 +29,9 @@ class Course extends Model
             'price' => 'decimal:2',
             'rating_avg' => 'decimal:2',
             'published_at' => 'datetime',
+            'credit_bearing' => 'boolean',
+            'credits' => 'decimal:1',
+            'pass_threshold' => 'integer',
         ];
     }
 
@@ -105,6 +110,19 @@ class Course extends Model
         return $this->hasMany(Certificate::class);
     }
 
+    public function creditRecords(): HasMany
+    {
+        return $this->hasMany(CreditRecord::class);
+    }
+
+    /** Programs this course counts toward (credit bank). */
+    public function programs(): BelongsToMany
+    {
+        return $this->belongsToMany(Program::class, 'program_courses')
+            ->withPivot(['requirement', 'sort_order', 'credits_override'])
+            ->withTimestamps();
+    }
+
     public function certificateFor(?User $user): ?Certificate
     {
         return $user ? $this->certificates()->where('user_id', $user->id)->first() : null;
@@ -118,6 +136,19 @@ class Course extends Model
     public function isFree(): bool
     {
         return (float) $this->price <= 0;
+    }
+
+    /** Whether completing this course banks credits. */
+    public function isCreditBearing(): bool
+    {
+        return (bool) $this->credit_bearing && (float) $this->credits > 0;
+    }
+
+    public function getCreditsLabelAttribute(): string
+    {
+        return $this->isCreditBearing()
+            ? CreditRecord::fmt($this->credits) . ' หน่วยกิต'
+            : '—';
     }
 
     public function getPriceLabelAttribute(): string

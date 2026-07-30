@@ -3,6 +3,19 @@
         <h1 class="text-2xl font-bold">การเรียนของฉัน</h1>
         <p class="text-gray-500 mt-1">สวัสดี {{ auth()->user()->name }} มาเรียนต่อกันเถอะ</p>
 
+        {{-- Credit bank summary --}}
+        <a href="{{ route('credit-bank.index') }}"
+           class="mt-5 flex items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-6 py-4 hover:from-indigo-700 hover:to-violet-700 transition">
+            <div class="flex items-center gap-3">
+                <i class="bi bi-mortarboard-fill text-2xl" aria-hidden="true"></i>
+                <div>
+                    <p class="text-sm text-indigo-100">คลังหน่วยกิตของฉัน</p>
+                    <p class="font-semibold">หน่วยกิตสะสม {{ \App\Models\CreditRecord::fmt($totalCredits) }} หน่วยกิต</p>
+                </div>
+            </div>
+            <span class="text-sm inline-flex items-center gap-1 shrink-0">ดูคลัง <i class="bi bi-arrow-right" aria-hidden="true"></i></span>
+        </a>
+
         @if ($enrollments->isEmpty())
             <div class="mt-8 rounded-2xl bg-white ring-1 ring-gray-200 p-12 text-center">
                 <x-icon name="book" class="text-5xl text-gray-300" />

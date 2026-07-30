@@ -61,4 +61,52 @@
         <p class="text-xs text-gray-400 mt-1">JPG/PNG ไม่เกิน 2MB — ถ้าไม่อัปโหลด จะใช้ปกไล่สีอัตโนมัติ</p>
         @error('thumbnail')<p class="text-red-600 text-sm mt-1">{{ $message }}</p>@enderror
     </div>
+
+    {{-- Credit bank settings (คลังหน่วยกิต) --}}
+    <div class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4"
+         x-data="{ bearing: {{ old('credit_bearing', $course?->credit_bearing) ? 'true' : 'false' }} }">
+        <label class="flex items-center gap-2 font-medium text-indigo-900 cursor-pointer">
+            <input type="hidden" name="credit_bearing" value="0">
+            <input type="checkbox" name="credit_bearing" value="1" x-model="bearing"
+                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+            <span><i class="bi bi-mortarboard" aria-hidden="true"></i> คอร์สนี้ให้หน่วยกิต (นับเข้าคลังหน่วยกิต)</span>
+        </label>
+
+        <div x-show="bearing" x-cloak class="mt-4 grid sm:grid-cols-2 gap-4">
+            <div>
+                <label for="course_code" class="block text-sm font-medium mb-1">รหัสวิชา</label>
+                <input type="text" name="course_code" id="course_code" value="{{ old('course_code', $course?->course_code) }}" placeholder="เช่น CS101"
+                       class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+                @error('course_code')<p class="text-red-600 text-sm mt-1">{{ $message }}</p>@enderror
+            </div>
+            <div>
+                <label for="credits" class="block text-sm font-medium mb-1">จำนวนหน่วยกิต</label>
+                <input type="number" name="credits" id="credits" step="0.5" min="0" max="99" value="{{ old('credits', $course ? \App\Models\CreditRecord::fmt($course->credits) : '') }}" placeholder="เช่น 3"
+                       class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+                @error('credits')<p class="text-red-600 text-sm mt-1">{{ $message }}</p>@enderror
+            </div>
+            <div>
+                <label for="learning_hours" class="block text-sm font-medium mb-1">ชั่วโมงเรียนรู้</label>
+                <input type="number" name="learning_hours" id="learning_hours" min="0" max="9999" value="{{ old('learning_hours', $course?->learning_hours) }}" placeholder="เช่น 45"
+                       class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+                @error('learning_hours')<p class="text-red-600 text-sm mt-1">{{ $message }}</p>@enderror
+            </div>
+            <div>
+                <label for="grading_method" class="block text-sm font-medium mb-1">วิธีให้เกรด</label>
+                <select name="grading_method" id="grading_method"
+                        class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+                    @foreach (['pass_fail' => 'ผ่าน/ไม่ผ่าน (S/U)', 'graded' => 'ให้เกรด A–F (จากคะแนนแบบทดสอบ)'] as $val => $label)
+                        <option value="{{ $val }}" @selected(old('grading_method', $course?->grading_method ?? 'pass_fail') === $val)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="pass_threshold" class="block text-sm font-medium mb-1">เกณฑ์ผ่าน (%)</label>
+                <input type="number" name="pass_threshold" id="pass_threshold" min="0" max="100" value="{{ old('pass_threshold', $course?->pass_threshold ?? 70) }}"
+                       class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+                <p class="text-xs text-gray-400 mt-1">คะแนนแบบทดสอบขั้นต่ำที่ถือว่าผ่านและได้รับหน่วยกิต</p>
+                @error('pass_threshold')<p class="text-red-600 text-sm mt-1">{{ $message }}</p>@enderror
+            </div>
+        </div>
+    </div>
 </div>

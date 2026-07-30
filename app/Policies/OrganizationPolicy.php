@@ -1,0 +1,19 @@
+<?php
+
+namespace App\Policies;
+
+use App\Models\Organization;
+use App\Models\User;
+
+class OrganizationPolicy
+{
+    public function view(User $user, Organization $organization): bool
+    {
+        return $user->isAdmin() || $organization->hasMember($user);
+    }
+
+    public function manage(User $user, Organization $organization): bool
+    {
+        return $user->isAdmin() || $organization->canManage($user);
+    }
+}

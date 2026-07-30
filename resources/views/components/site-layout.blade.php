@@ -33,6 +33,7 @@
                     </form>
 
                     <a href="{{ route('courses.index') }}" class="text-sm font-medium text-gray-600 hover:text-indigo-600 hidden lg:block">คอร์สทั้งหมด</a>
+                    <a href="{{ route('programs.index') }}" class="text-sm font-medium text-gray-600 hover:text-indigo-600 hidden lg:block">หลักสูตร</a>
 
                     <div class="flex-1 md:flex-none"></div>
 
@@ -66,8 +67,13 @@
                                     <p class="text-gray-500 text-xs truncate">{{ auth()->user()->email }}</p>
                                 </div>
                                 <a href="{{ route('dashboard') }}" class="block px-4 py-2 hover:bg-gray-50">การเรียนของฉัน</a>
+                                <a href="{{ route('credit-bank.index') }}" class="block px-4 py-2 hover:bg-gray-50">คลังหน่วยกิต</a>
+                                <a href="{{ route('org.index') }}" class="block px-4 py-2 hover:bg-gray-50">องค์กรของฉัน</a>
                                 @if (auth()->user()->isInstructor())
                                     <a href="{{ route('studio.index') }}" class="block px-4 py-2 hover:bg-gray-50">สตูดิโอผู้สอน</a>
+                                @endif
+                                @if (auth()->user()->isRegistrar())
+                                    <a href="{{ route('registrar.dashboard') }}" class="block px-4 py-2 hover:bg-gray-50 text-indigo-600">นายทะเบียน</a>
                                 @endif
                                 @if (auth()->user()->isAdmin())
                                     <a href="{{ route('admin.dashboard') }}" class="block px-4 py-2 hover:bg-gray-50 text-rose-600">แผงผู้ดูแลระบบ</a>

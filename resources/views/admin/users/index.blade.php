@@ -1,6 +1,6 @@
 <x-admin-layout title="ผู้ใช้" active="users">
     @php
-        $roleBadge = ['admin' => 'bg-rose-100 text-rose-700', 'instructor' => 'bg-violet-100 text-violet-700', 'student' => 'bg-gray-100 text-gray-600'];
+        $roleBadge = ['admin' => 'bg-rose-100 text-rose-700', 'registrar' => 'bg-indigo-100 text-indigo-700', 'instructor' => 'bg-violet-100 text-violet-700', 'student' => 'bg-gray-100 text-gray-600'];
     @endphp
 
     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -12,6 +12,7 @@
                 <option value="">ทุกบทบาท</option>
                 <option value="student" @selected(request('role')==='student')>ผู้เรียน</option>
                 <option value="instructor" @selected(request('role')==='instructor')>ผู้สอน</option>
+                <option value="registrar" @selected(request('role')==='registrar')>นายทะเบียน</option>
                 <option value="admin" @selected(request('role')==='admin')>แอดมิน</option>
             </select>
             <button class="rounded-lg bg-gray-900 px-4 text-sm font-semibold text-white hover:bg-gray-800">ค้นหา</button>
@@ -36,7 +37,7 @@
                                 <div class="flex items-center gap-3">
                                     <span class="grid place-items-center h-9 w-9 rounded-full bg-indigo-100 text-indigo-700 font-semibold shrink-0">{{ mb_strtoupper(mb_substr($u->name, 0, 1)) }}</span>
                                     <div class="min-w-0">
-                                        <p class="font-medium truncate">{{ $u->name }}</p>
+                                        <a href="{{ route('admin.users.profile.edit', $u) }}" class="font-medium truncate hover:text-indigo-600 inline-flex items-center gap-1">{{ $u->name }} <i class="bi bi-pencil text-xs text-gray-300" aria-hidden="true"></i></a>
                                         <p class="text-xs text-gray-400 truncate">{{ $u->email }}</p>
                                     </div>
                                 </div>
@@ -56,6 +57,7 @@
                                                 class="rounded-lg border-gray-300 text-xs focus:border-indigo-500 focus:ring-indigo-500">
                                             <option value="student" @selected($u->role==='student')>ผู้เรียน</option>
                                             <option value="instructor" @selected($u->role==='instructor')>ผู้สอน</option>
+                                            <option value="registrar" @selected($u->role==='registrar')>นายทะเบียน</option>
                                             <option value="admin" @selected($u->role==='admin')>แอดมิน</option>
                                         </select>
                                     </form>

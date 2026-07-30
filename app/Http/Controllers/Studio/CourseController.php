@@ -47,6 +47,7 @@ class CourseController extends Controller
             'language' => 'th',
             'status' => 'draft',
             'thumbnail' => $this->storeThumbnail($request),
+            ...$this->creditAttributes($request, $data),
         ]);
 
         return redirect()
@@ -77,6 +78,7 @@ class CourseController extends Controller
             'description' => $data['description'] ?? null,
             'price' => $data['price'],
             'level' => $data['level'],
+            ...$this->creditAttributes($request, $data),
         ]);
 
         if ($file = $this->storeThumbnail($request)) {
@@ -128,6 +130,21 @@ class CourseController extends Controller
         return Category::orderBy('sort_order')->get();
     }
 
+    /** Build the credit-bank attributes from validated input. */
+    private function creditAttributes(Request $request, array $data): array
+    {
+        $bearing = $request->boolean('credit_bearing');
+
+        return [
+            'course_code' => $data['course_code'] ?? null,
+            'credit_bearing' => $bearing,
+            'credits' => $bearing ? ($data['credits'] ?? 0) : 0,
+            'learning_hours' => $data['learning_hours'] ?? 0,
+            'grading_method' => $data['grading_method'] ?? 'pass_fail',
+            'pass_threshold' => $data['pass_threshold'] ?? 70,
+        ];
+    }
+
     private function validateCourse(Request $request): array
     {
         return $request->validate([
@@ -138,6 +155,13 @@ class CourseController extends Controller
             'price' => ['required', 'numeric', 'min:0', 'max:100000'],
             'level' => ['required', 'in:beginner,intermediate,advanced'],
             'thumbnail' => ['nullable', 'image', 'max:2048'],
+            // Credit bank (คลังหน่วยกิต)
+            'course_code' => ['nullable', 'string', 'max:32'],
+            'credit_bearing' => ['nullable', 'boolean'],
+            'credits' => ['nullable', 'numeric', 'min:0', 'max:99'],
+            'learning_hours' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'grading_method' => ['nullable', 'in:pass_fail,graded'],
+            'pass_threshold' => ['nullable', 'integer', 'min:0', 'max:100'],
         ]);
     }
 

@@ -1,10 +1,15 @@
 @props(['title' => 'ผู้ดูแลระบบ', 'active' => 'dashboard'])
 
 @php
+    $pendingTransfers = \App\Models\CreditTransferRequest::where('status', 'pending')->count();
     $nav = [
         ['key' => 'dashboard', 'route' => 'admin.dashboard', 'icon' => 'bi-speedometer2', 'label' => 'ภาพรวม'],
         ['key' => 'users', 'route' => 'admin.users.index', 'icon' => 'bi-people', 'label' => 'ผู้ใช้'],
         ['key' => 'courses', 'route' => 'admin.courses.index', 'icon' => 'bi-collection-play', 'label' => 'คอร์ส'],
+        ['key' => 'programs', 'route' => 'admin.programs.index', 'icon' => 'bi-mortarboard', 'label' => 'หลักสูตร'],
+        ['key' => 'qualifications', 'route' => 'admin.qualifications.index', 'icon' => 'bi-patch-check', 'label' => 'คุณวุฒิ'],
+        ['key' => 'transfers', 'route' => 'admin.transfers.index', 'icon' => 'bi-arrow-left-right', 'label' => 'เทียบโอน', 'badge' => $pendingTransfers],
+        ['key' => 'organizations', 'route' => 'admin.organizations.index', 'icon' => 'bi-buildings', 'label' => 'องค์กร'],
         ['key' => 'coupons', 'route' => 'admin.coupons.index', 'icon' => 'bi-tag', 'label' => 'คูปอง'],
     ];
 @endphp
@@ -39,8 +44,11 @@
             <nav class="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible">
                 @foreach ($nav as $item)
                     <a href="{{ route($item['route']) }}"
-                       class="inline-flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 {{ $active === $item['key'] ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100' }}">
+                       class="inline-flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 {{ $active === $item['key'] ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100' }}">
                         <i class="bi {{ $item['icon'] }}" aria-hidden="true"></i> {{ $item['label'] }}
+                        @if (($item['badge'] ?? 0) > 0)
+                            <span class="grid h-5 min-w-[1.25rem] place-items-center rounded-full bg-rose-500 px-1 text-xs font-semibold text-white {{ $active === $item['key'] ? 'ring-2 ring-white/40' : '' }}">{{ $item['badge'] }}</span>
+                        @endif
                     </a>
                 @endforeach
             </nav>
